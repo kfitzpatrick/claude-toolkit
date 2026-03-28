@@ -1,0 +1,14 @@
+{
+  "name": "kfitz-tools",
+  "owner": {
+    "name": "Kevin Fitzpatrick"
+  },
+  "plugins": [
+    {
+      "name": "claude-toolkit",
+      "source": "./plugin",
+      "description": "Personal dev toolkit — prove, retro, grill-me, find-skills, openspec utilities",
+      "version": "1.0.0"
+    }
+  ]
+}
