@@ -38,9 +38,21 @@ Review the conversation for cases where I did something manually that existing t
 
 Look for non-Bash tools that required approval too (e.g., Read paths outside the project, MCP tools, WebFetch domains). Suggest additions if they'd be frequently useful.
 
-### 5. Present findings
+### 5. Identify skill candidate patterns
 
-Summarize in two tables:
+Scan the **user messages** in this session for natural-language requests that imply a multi-step, parameterizable workflow worth codifying as a reusable skill.
+
+Candidate signals to look for:
+- An imperative directed at a named external system with a parameterizable identifier (e.g., "familiarize yourself with CLP-5572 in JIRA", "look at PR #123")
+- A fetch-then-summarize pattern where a single user sentence resulted in 3 or more sequential tool calls to fulfill it (e.g., "summarize the last 10 commits")
+
+**Pre-check before flagging:** For each candidate, verify it is NOT already covered by an available skill from the session's skill list or a script in `~/.claude/scripts/`. If it is already covered, do not add it to the Skill Candidates table — route it to the Missed Tooling findings instead (it belongs there, not here).
+
+If no user messages match these signals, skip this section entirely.
+
+### 6. Present findings
+
+Summarize in up to three tables:
 
 **Approval Friction:**
 
@@ -56,6 +68,13 @@ Summarize in two tables:
 | Raw GitHub API search | `~/.claude/scripts/my-prs.sh` or `/my-prs` skill | Reinvented existing functionality |
 | Manually read openspec/ files | `npx openspec list --json` | More approvals, messier output |
 
+**Skill Candidates** *(omit section if none found):*
+
+| What You Asked | Implied Workflow | Suggested Skill |
+|----------------|-----------------|-----------------|
+| "familiarize yourself with CLP-5572 in JIRA" | fetch ticket → read description/comments → summarize context | `/jira-context <id>` |
+| "summarize the last 10 commits" | git log → format summary | `/commit-digest` |
+
 If no issues are found in a category, say so briefly and move on.
 
 Then ask the user:
@@ -63,10 +82,18 @@ Then ask the user:
 - Whether any missed-tooling patterns should be saved as feedback memories
 - Whether any of the findings warrant updates to this `/retro` skill itself
 
-### 6. Apply approved changes
+If skill candidates were found, also ask:
+- **Placement**: For each candidate — is it broadly useful across projects (→ claude-toolkit plugin), or tied specifically to this codebase?
+- **Interest**: Would you like to start an `/opsx:explore` session to develop any of these into a skill?
+- **Calibration**: Did I miss any patterns that could become a skill? Or flag something too eagerly — too rare to be worth it, too project-specific, or already covered by something?
+
+### 7. Apply approved changes
 
 For any permissions the user approves:
 - Use the `/update-config` skill to add them to the appropriate settings file (global for cross-project commands, project-local for project-specific ones)
 
 For any behavioral feedback worth remembering:
 - Save it as a feedback memory so future sessions benefit
+
+For calibration answers about skill candidate detection:
+- Save as a feedback memory (e.g., "don't flag X type of pattern", "always flag Y pattern") so future retro sessions detect more accurately
