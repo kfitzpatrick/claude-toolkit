@@ -187,8 +187,9 @@ for repo in $REPOS; do
     fail_cell=""
 
     if [ "$check_count" -gt 0 ]; then
-      has_pending=$(echo "$checks" | jq '[.[] | select(.status != "COMPLETED")] | length')
-      failed_json=$(echo "$checks" | jq -c '[.[] | select(.status == "COMPLETED" and .conclusion != "SUCCESS" and .conclusion != "SKIPPED" and .conclusion != "NEUTRAL")]')
+      deduped=$(echo "$checks" | jq -c '[sort_by(.completedAt) | reverse | unique_by(.name) | .[]]')
+      has_pending=$(echo "$deduped" | jq '[.[] | select(.status != "COMPLETED")] | length')
+      failed_json=$(echo "$deduped" | jq -c '[.[] | select(.status == "COMPLETED" and .conclusion != "SUCCESS" and .conclusion != "SKIPPED" and .conclusion != "NEUTRAL" and .conclusion != "CANCELLED")]')
       failed_count=$(echo "$failed_json" | jq 'length')
 
       if [ "$has_pending" -gt 0 ]; then
