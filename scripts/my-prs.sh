@@ -189,7 +189,7 @@ for repo in $REPOS; do
     if [ "$check_count" -gt 0 ]; then
       deduped=$(echo "$checks" | jq -c '[sort_by(.completedAt) | reverse | unique_by(.name) | .[]]')
       has_pending=$(echo "$deduped" | jq '[.[] | select(.status != "COMPLETED")] | length')
-      failed_json=$(echo "$deduped" | jq -c '[.[] | select(.status == "COMPLETED" and .conclusion != "SUCCESS" and .conclusion != "SKIPPED" and .conclusion != "NEUTRAL" and .conclusion != "CANCELLED")]')
+      failed_json=$(echo "$deduped" | jq -c '[.[] | select(.status == "COMPLETED" and .conclusion != "SUCCESS" and .conclusion != "SKIPPED" and .conclusion != "NEUTRAL" and .conclusion != "CANCELLED" and .conclusion != "STALE")]')
       failed_count=$(echo "$failed_json" | jq 'length')
 
       if [ "$has_pending" -gt 0 ]; then
