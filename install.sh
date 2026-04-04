@@ -152,6 +152,30 @@ do_install() {
   printf '\nStatusline:\n'
   ensure_symlink "$TOOLKIT_DIR/statusline-command.sh" "$CLAUDE_DIR/statusline-command.sh"
 
+  printf '\nOpenSpec schemas:\n'
+  if [ -d "$TOOLKIT_DIR/openspec/schemas" ]; then
+    mkdir -p "$HOME/.local/share/openspec/schemas"
+    for schema_dir in "$TOOLKIT_DIR"/openspec/schemas/*/; do
+      [ -d "$schema_dir" ] || continue
+      schema_name="$(basename "$schema_dir")"
+      dest="$HOME/.local/share/openspec/schemas/$schema_name"
+      # OpenSpec uses dirent.isDirectory() which doesn't follow symlinks,
+      # so we must copy rather than symlink.
+      if [ -d "$dest" ] && [ ! -L "$dest" ]; then
+        # Compare content; skip if up to date
+        if diff -rq "$schema_dir" "$dest" > /dev/null 2>&1; then
+          skip "$schema_name (schema)"
+          continue
+        fi
+        rm -rf "$dest"
+      elif [ -L "$dest" ]; then
+        rm "$dest"
+      fi
+      cp -r "$schema_dir" "$dest"
+      ok "$schema_name (schema copied)"
+    done
+  fi
+
   printf '\nCLAUDE.md:\n'
   install_claude_md
 
@@ -172,6 +196,24 @@ do_uninstall() {
 
   printf '\nStatusline:\n'
   remove_symlink "$TOOLKIT_DIR/statusline-command.sh" "$CLAUDE_DIR/statusline-command.sh"
+
+  printf '\nOpenSpec schemas:\n'
+  if [ -d "$TOOLKIT_DIR/openspec/schemas" ]; then
+    for schema_dir in "$TOOLKIT_DIR"/openspec/schemas/*/; do
+      [ -d "$schema_dir" ] || continue
+      schema_name="$(basename "$schema_dir")"
+      dest="$HOME/.local/share/openspec/schemas/$schema_name"
+      if [ -d "$dest" ] && [ ! -L "$dest" ]; then
+        rm -rf "$dest"
+        ok "removed $schema_name (schema)"
+      elif [ -L "$dest" ]; then
+        rm "$dest"
+        ok "removed $schema_name (schema)"
+      else
+        skip "$schema_name (schema not present)"
+      fi
+    done
+  fi
 
   printf '\nCLAUDE.md:\n'
   uninstall_claude_md

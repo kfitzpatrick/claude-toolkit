@@ -30,6 +30,26 @@ Skills available as `/claude-toolkit:<name>`:
 | `find-skills` | Discover and install community skills |
 | `openspec-stale` | Find OpenSpec changes already merged into dev |
 | `openspec-status` | Dashboard of all open OpenSpec changes |
+| `feature-analysis` | Agent Team process for analyzing legacy features before migration (see below) |
+
+### feature-analysis
+
+A skill for safely migrating legacy features. Spawns a Claude Agent Team (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` required) that:
+
+1. **Interviews you** about the feature scope, permissions, known quirks, and dev environment
+2. **Maps the code** — Code Explorer traces the dependency graph via LSP (routes → controllers → components → services → models), spawning subagents for Test Portability Scoring and Playwright script generation
+3. **Verifies in the browser** — Browser Explorer runs a scripted Playwright batch against your dev app, then does targeted exploration for edge cases
+4. **Produces a confidence-graded spec** — every discovered behavior is classified as CONFIRMED, PRESERVE QUIRK, CORRECT IN SPEC, OUT OF SCOPE, or DEFER
+5. **Resolves ambiguities with you** — inconsistencies are presented as batched Q&A, not silent assumptions
+6. **Outputs** a `feature-analysis.md` artifact + a Playwright test suite (the migration contract)
+
+The skill pairs with the `migration-workflow` OpenSpec schema (installed via `./install.sh`), which adds a `feature-analysis` artifact step before design and specs in any change:
+
+```bash
+openspec new change my-feature-migration --schema migration-workflow
+```
+
+**Requires:** Claude Code v2.1.32+, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, Playwright in the target project
 
 ### Bootstrap (installed via `./install.sh`)
 
@@ -40,6 +60,7 @@ Skills available as `/claude-toolkit:<name>`:
 | `scripts/git-read.sh` | Read-only git info for PR workflows |
 | `statusline-command.sh` | Custom status line with git branch, model, and context usage |
 | `CLAUDE.md` | Personal workflow preferences (merged into `~/.claude/CLAUDE.md`) |
+| `openspec/schemas/migration-workflow` | Custom OpenSpec schema (copied to `~/.local/share/openspec/schemas/`) |
 
 ## Usage
 
