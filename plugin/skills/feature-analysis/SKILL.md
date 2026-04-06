@@ -33,7 +33,14 @@ Collect answers before proceeding. If answers are unclear, ask follow-ups.
 
 ## Step 2: Create the Agent Team
 
-Create a team with three teammates. Tell Claude Code to create the team with these members:
+**This skill requires Claude Code Agent Teams.** Before proceeding, verify the feature is available:
+- The env var `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` must be set
+- You must be running Claude Code v2.1.32+
+- If Agent Teams is not available, tell the user: "This skill requires Agent Teams. Launch Claude with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 claude --plugin-dir <path>` and re-run `/feature-analysis`."
+
+Do **not** use the `Agent` tool to spawn subagents as a fallback — the peer-to-peer communication between teammates is essential to this workflow.
+
+Create three teammates using the Agent Teams feature (not the Agent tool). For each teammate below, use the `create_teammate` capability or instruct Claude Code directly: "Add a teammate named [Name] with these instructions: [prompt]". Wait for all three teammates to be created before proceeding to Step 3.
 
 ### Code Explorer
 

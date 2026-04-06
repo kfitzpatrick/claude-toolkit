@@ -22,8 +22,24 @@
 - [x] 3.3 Test: fresh install copies schema, `openspec schema which --all` shows `migration-workflow` with `source: "user"` ✓
 - [x] 3.4 Test: re-run is idempotent (skips when content matches), uninstall removes schema directory ✓
 
-## 4. Validation
+## 4. Skill Rewrite (subagent model)
 
-- [x] 4.1 Create a test change in web-app using `--schema migration-workflow`, verify artifact ordering and status ✓
-- [ ] 4.2 Invoke the skill in a Claude Code session, verify team creation instructions are clear and complete
-- [ ] 4.3 Run the full process against a small feature in web-app as an integration test
+- [ ] 4.1 Rewrite SKILL.md — replace Agent Teams coordination with flat subagent orchestration (Lead spawns all agents via Agent tool in sequence)
+- [ ] 4.2 Add state file protocol to Code Explorer and Browser Explorer prompts — two exit modes (question / done), incremental writes after each discovery
+- [ ] 4.3 Add run log instructions to Lead — create run directory at interview completion, write phase files after each subagent returns
+- [ ] 4.4 Add model assignments to each subagent spawn instruction (Haiku for Portability Scorer, Opus for Spec Writer, Sonnet for others)
+- [ ] 4.5 Promote Test Portability Scorer and Script Generator to flat subagents (remove from inside Code Explorer prompt)
+
+## 5. Spike — Q&A Loop
+
+- [ ] 5.1 Run Code Explorer against a small web-app feature with the new SKILL.md
+- [ ] 5.2 Verify: does Code Explorer detect when it needs to ask a question vs. proceed?
+- [ ] 5.3 Verify: does restarting with state file + answer work in practice?
+- [ ] 5.4 Measure: how many round trips does a real exploration need?
+- [ ] 5.5 Document findings — update design.md if the pattern needs adjustment
+
+## 6. Validation
+
+- [ ] 6.1 Invoke `/feature-analysis` against a small web-app feature, verify full pipeline runs
+- [ ] 6.2 Verify run log is created and contains all phase files
+- [ ] 6.3 Run the full process against a real feature in web-app as integration test

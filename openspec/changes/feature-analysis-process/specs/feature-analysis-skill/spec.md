@@ -1,17 +1,51 @@
 ## ADDED Requirements
 
-### Requirement: Skill defines a two-tier agent team
-The skill SHALL instruct the Lead agent to spawn a team with four members (Lead, Code Explorer, Browser Explorer, Spec Writer) and define three subagent roles (Script Generator, Test Portability Scorer, Gap Analyzer) that teammates spawn internally.
+### Requirement: Skill uses a flat subagent orchestration model
+The skill SHALL instruct the Lead to orchestrate five subagents directly via the Agent tool in sequence: Code Explorer, Test Portability Scorer, Script Generator, Browser Explorer, Spec Writer. The Lead spawns each subagent, receives its output, and injects that output into the next subagent's prompt.
 
-#### Scenario: Team creation
-- **WHEN** the user invokes `/claude-toolkit:feature-analysis`
-- **THEN** the skill prompt instructs the Lead to create an Agent Team with the defined members
-- **AND** each teammate's spawn prompt includes their role, responsibilities, and interaction rules
+#### Scenario: Sequential subagent execution
+- **WHEN** the user invokes `/feature-analysis`
+- **THEN** the Lead runs the pre-analysis interview, then spawns subagents in order
+- **AND** each subagent receives the prior subagents' outputs injected into its prompt
+- **AND** the Spec Writer receives all outputs plus human resolutions
 
-#### Scenario: Subagent usage
-- **WHEN** the Code Explorer needs to generate a Playwright verification script
-- **THEN** it spawns a Script Generator subagent within its own session
-- **AND** the subagent returns the script and its context is reclaimed
+#### Scenario: Model selection per subagent
+- **WHEN** the Lead spawns each subagent
+- **THEN** it uses the designated model: Haiku for Portability Scorer, Opus for Spec Writer, Sonnet for all others
+
+### Requirement: Subagents can pause and ask the Lead a question
+Code Explorer and Browser Explorer SHALL support two exit modes: question mode (write state, return question) and done mode (return findings). The Lead SHALL restart a subagent that exits in question mode by injecting its state file path and the human's answer into the new prompt.
+
+#### Scenario: Subagent needs clarification
+- **WHEN** Code Explorer or Browser Explorer encounters an ambiguity it cannot resolve from code alone
+- **THEN** it writes its current state to its state file
+- **AND** returns a structured question to the Lead
+- **AND** the Lead presents the question to the human and restarts the subagent with the answer
+
+#### Scenario: Subagent resumes from state
+- **WHEN** the Lead restarts a subagent after answering its question
+- **THEN** the subagent's prompt includes the state file path and the answer
+- **AND** the subagent reads its state file to reorient before continuing
+
+### Requirement: Subagents write state files incrementally
+Code Explorer and Browser Explorer SHALL write to their state file after each meaningful discovery, not only when pausing to ask a question.
+
+#### Scenario: Incremental state capture
+- **WHEN** Code Explorer discovers a new file, API endpoint, or component boundary
+- **THEN** it appends the finding to its state file before continuing
+- **AND** if the run is interrupted, the state file contains all work completed so far
+
+### Requirement: Each run produces a structured log directory
+The Lead SHALL create a run log directory at the start of each run and write the injected prompt and returned output for each subagent phase.
+
+#### Scenario: Run log creation
+- **WHEN** the pre-analysis interview completes
+- **THEN** the Lead creates `~/.claude/feature-analysis-runs/<feature-name>-<date>/`
+- **AND** writes `00-interview.md` with structured interview answers before spawning any subagent
+
+#### Scenario: Phase logging
+- **WHEN** a subagent returns its output
+- **THEN** the Lead writes `<NN>-<agent-name>.md` with the injected prompt and the returned output
 
 ### Requirement: Code Explorer uses LSP-first navigation
 The skill SHALL instruct the Code Explorer to trace feature dependency graphs using LSP operations (`workspaceSymbol`, `goToDefinition`, `outgoingCalls`, `findReferences`, `incomingCalls`) as the primary navigation method, falling back to grep/glob for patterns LSP cannot resolve.

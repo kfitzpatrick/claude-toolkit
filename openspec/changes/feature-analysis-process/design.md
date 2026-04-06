@@ -18,7 +18,7 @@ Agent Teams is an experimental Claude Code feature (`CLAUDE_CODE_EXPERIMENTAL_AG
 - Building a programmatic orchestrator (Python/TS script that calls the Claude API) — this uses Claude Code's native Agent Teams, not the SDK
 - Automating the human-in-the-loop resolution — the human is always in the loop for non-CONFIRMED findings
 - Defining the Playwright test infrastructure for target projects — the skill tells the team to write Playwright tests, but setting up Playwright in the target project is out of scope
-- Making this work without the Agent Teams experimental flag — if the flag is off, the skill won't work
+- Eliminating round trips in the Q&A loop — each question requires human input and a subagent restart; this latency is by design, not a bug to fix
 
 ## Decisions
 
@@ -46,15 +46,86 @@ Agent Teams is an experimental Claude Code feature (`CLAUDE_CODE_EXPERIMENTAL_AG
 
 **Alternative considered**: Freeform template that just says "list findings." Rejected because the confidence-grading model is the core value proposition.
 
-### 4. Skill prompt defines spawn prompts for each teammate
+### 4. Skill uses regular subagents (Agent tool) not Agent Teams
 
-**Decision**: The skill's `prompt.md` includes the full spawn prompt for each teammate (Code Explorer, Browser Explorer, Spec Writer). The Lead reads these from the skill and uses them when creating the team.
+**Decision**: The skill orchestrates work via Claude Code's `Agent` tool (regular subagents) rather than the experimental Agent Teams feature.
 
-**Rationale**: Spawn prompts need to include the teammate's role, tools, interaction rules, and the brownfield stance. Keeping them in the skill means they're version-controlled and portable.
+**Rationale**: Live testing showed Agent Teams burned through tokens without producing meaningful output. More fundamentally, the work is inherently sequential — Code Explorer must finish before Browser Explorer can run its script, and both must finish before Spec Writer can synthesize. Agent Teams' primary advantage is parallel peer-to-peer collaboration, which doesn't apply here. Regular subagents run to completion, return structured output to the Lead, and the Lead injects that output into the next subagent's prompt — simpler, more reliable, no experimental flag required.
 
-**Alternative considered**: Having the Lead agent write spawn prompts dynamically based on high-level role descriptions. Rejected because prompt quality directly affects teammate behavior — tested prompts are better than improvised ones.
+**Alternative considered**: Agent Teams with sequential task dependencies. Rejected because the coordination overhead (independent sessions, token burn, setup friction) outweighed the benefit for a sequential pipeline.
 
-### 5. install.sh uses ensure_symlink for schema distribution
+### 5. Flat coordination structure — Lead orchestrates all subagents directly
+
+**Decision**: All subagents are spawned directly by the Lead. There are no subagents-within-subagents.
+
+Subagents (in order):
+1. Code Explorer → dependency graph, API list, Angular/React footprint
+2. Test Portability Scorer (with Code Explorer file list injected)
+3. Script Generator (with Code Explorer findings injected)
+4. Browser Explorer (with Script Generator output + Code Explorer findings injected)
+5. Spec Writer (with all prior outputs + human resolutions injected)
+
+**Rationale**: The Lead has full context at every handoff point. Nesting subagents inside other subagents adds complexity without benefit — the Lead is better positioned to inject exactly what each subagent needs.
+
+**Alternative considered**: Code Explorer spawns Test Portability Scorer and Script Generator internally. Rejected in favor of flat structure for simplicity and Lead visibility.
+
+### 6. Subagents can pause and ask the Lead a question
+
+**Decision**: Subagents (Code Explorer and Browser Explorer) have two exit modes:
+
+- **Mode A — question**: Write current state to a state file, return a question to the Lead. The Lead asks the human, then restarts the subagent with the state file path + the answer injected.
+- **Mode B — done**: Return full findings to the Lead. Optionally clean up state file.
+
+**Rationale**: A bloated upfront interview that tries to anticipate everything is worse than letting subagents surface what they actually need mid-run. The Q&A loop allows the Lead to remain the single point of contact with the human while subagents remain focused on their task.
+
+**Alternative considered**: Fully upfront interview that tries to capture all needed context before spawning. Rejected because real exploration surfaces unknowns that cannot be anticipated.
+
+### 7. Subagents write state files incrementally
+
+**Decision**: Subagents write to their state file after each meaningful discovery, not just when pausing to ask a question. The state file is the subagent's working memory.
+
+**Rationale**: If the user stops a long-running subagent mid-run, the state file preserves all work done so far. The Lead can inspect partial findings and either restart the subagent or present partial results. This solves both the "how do we capture progress" problem and the "how do we resume after a question" problem with the same mechanism.
+
+**State file location**: `<run-log-dir>/<agent-name>-state.md`, derived from the run directory (see Decision 8).
+
+### 8. Run logs capture full prompt/response history
+
+**Decision**: Each run produces a structured log directory:
+
+```
+~/.claude/feature-analysis-runs/
+  <feature-name>-<date>/
+    00-interview.md          ← structured interview answers (Lead constructs before spawning)
+    01-code-explorer.md      ← injected prompt + returned findings
+    02-portability-scorer.md
+    03-script-generator.md
+    04-browser-explorer.md
+    05-human-resolutions.md  ← each Q&A round with the human
+    06-spec-writer.md
+    07-feature-analysis.md   ← final artifact (copy)
+    <agent-name>-state.md    ← incremental state files (cleaned up on completion)
+```
+
+**Rationale**: Reproducibility and iteration. The prompt injected into each subagent is deterministic (Lead constructs it); the response is whatever the subagent returns. Together they form a full replay log. As the process is refined, logs from prior runs make it possible to see exactly what changed and why.
+
+**Default location**: `~/.claude/feature-analysis-runs/`. Could be made configurable via the pre-analysis interview if projects prefer logs stored alongside their OpenSpec changes.
+
+### 9. Model assignments per agent
+
+**Decision**:
+
+| Agent | Model | Rationale |
+|---|---|---|
+| Lead | Sonnet | Orchestration and interview — many turns, needs judgment |
+| Code Explorer | Sonnet | Graph traversal is complex reasoning; tune to Opus if results are poor |
+| Test Portability Scorer | Haiku | Pattern classification against known signals — simple task |
+| Script Generator | Sonnet | Playwright generation is structured but non-trivial |
+| Browser Explorer | Sonnet | Interpreting browser output needs judgment |
+| Spec Writer | Opus | Synthesis across all inputs, confidence grading — highest-stakes output |
+
+**Rationale**: Spec Writer gets Opus because it's the only agent whose output goes directly to the human as a deliverable. Portability Scorer gets Haiku because it's purely checking for known string patterns. All others use Sonnet as the default with room to tune.
+
+### 10. install.sh uses cp -r for schema distribution
 
 **Decision**: Reuse the existing `ensure_symlink` function in `install.sh` to create `~/.local/share/openspec/schemas/migration-workflow → <toolkit>/openspec/schemas/migration-workflow`. Create the parent directory if it doesn't exist.
 
